@@ -1,0 +1,5 @@
+{:lint-as
+ {manufaktura.stories.macros/defdoc clojure.core/defn}
+ :hooks
+ {:analyze-call
+  {manufaktura.stories.macros/defstory hooks.stories/defstory}}}

@@ -1,0 +1,30 @@
+# Clojure
+.cpcache/
+.lsp/
+.clj-kondo/.cache/
+target/
+classes/
+.clj-kondo/.cache/
+
+# Shadow-CLJS
+.shadow-cljs/
+node_modules/
+out/
+
+# Build output
+cljs-stories/
+storybook-static/
+resources/public/css/
+public/
+
+# Private local tooling
+/dev/
+
+# Misc
+.nrepl-port
+*.log
+.DS_Store
+calva/
+
+#playwright
+.playwright-mcp/

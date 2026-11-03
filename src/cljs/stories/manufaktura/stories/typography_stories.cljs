@@ -1,0 +1,100 @@
+(ns manufaktura.stories.typography-stories
+  (:require
+   [manufaktura.stories.helpers                              :as helpers]
+   [manufaktura.stories.typography.type-scale                :as example-type-scale]
+   [manufaktura.stories.typography.typography-full-prose     :as example-typography-full-prose]
+   [manufaktura.stories.typography.typography-recipe-gallery :as example-typography-recipe-gallery]
+   [manufaktura.stories.typography.typography-rtl            :as example-typography-rtl]
+   [reagent.core                                             :as r])
+  (:require-macros [manufaktura.stories.macros :refer [embed-source defstory defdoc]]))
+
+(def ^:export default
+  #js {:title "Components/Typography"
+       :parameters #js {:layout "padded"}})
+
+(defdoc
+ Installation
+ []
+ (r/as-element
+  [helpers/installation-scene
+   {:description
+    "Reusable shadcn-style semantic typography; a project extra rather than a registry module."
+    :source-code (embed-source "manufaktura.ui.components.typography")
+    :namespace-path "src/cljs/manufaktura/ui/components/typography.cljs"
+    :filename "typography.cljs"}]))
+
+(defstory
+ ApiReference
+ []
+ (r/as-element
+  (helpers/wrap-component
+   [:div {:class "max-w-4xl space-y-4 p-6"}
+    [helpers/api-component-card
+     {:component-name "h1 / h2 / h3 / h4 / p"
+      :description
+      "Semantic heading and paragraph elements using the canonical shadcn typography recipe classes."
+      :props [{:name ":class"
+               :type "string"
+               :default nil
+               :description "Classes merged with defaults."}
+              {:name "DOM props"
+               :type "map entries"
+               :default nil
+               :description "Forwarded to the semantic element."}]}]
+    [helpers/api-component-card {:component-name "blockquote / list / inline-code"
+                                 :description
+                                 "Semantic quotation, unordered-list, and inline code recipes."
+                                 :props [{:name ":class"
+                                          :type "string"
+                                          :default nil
+                                          :description "Classes merged with defaults."}]}]
+    [helpers/api-component-card
+     {:component-name "lead / large / small / muted / table"
+      :description
+      "Display text recipes plus a responsive table wrapper. Table props target the nested table."
+      :props [{:name ":class"
+               :type "string"
+               :default nil
+               :description "Classes merged with defaults."}]}]
+    [:div
+     {:class
+      "rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-muted-foreground"}
+     "Typography is a data-oriented set of plain Reagent functions, not a context or global prose style. Use semantic variants according to document structure."]])))
+
+(defstory
+ TypeScale
+ "Interactive typography playground."
+ {:args
+  {:heading "The Taxonomy of Type"
+   :body
+   "Typography should communicate hierarchy without coupling content to a page-specific stylesheet."}
+  :arg-types {:heading {:name "Heading"
+                        :control {:type "text"}}
+              :body {:name "Body"
+                     :control {:type "text"}}}
+  :parameters {:playground {:description "Explore typography heading and body with a live preview."}
+               :controls {:expanded false
+                          :exclude ["class"]}}
+  :source-code (embed-source "manufaktura.stories.typography.type-scale")}
+ [args]
+ (r/as-element (helpers/wrap-component [example-type-scale/example args])))
+
+(defstory TypographyRecipeGallery
+          "Comprehensive recipe gallery - every exported shadcn typography recipe shown in context."
+          {:source-code (embed-source "manufaktura.stories.typography.typography-recipe-gallery")}
+          []
+          (r/as-element (helpers/wrap-component [example-typography-recipe-gallery/example])))
+
+(defstory
+ TypographyFullProse
+ "Full prose - a complete upstream-style article demonstrates hierarchy, rhythm, lists, quotes, code, and tabular content."
+ {:source-code (embed-source "manufaktura.stories.typography.typography-full-prose")}
+ []
+ (r/as-element (helpers/wrap-component [example-typography-full-prose/example])))
+
+(defstory
+ TypographyRTL
+ "RTL - full right-to-left prose uses logical alignment while preserving semantic hierarchy."
+ {:source-code (embed-source "manufaktura.stories.typography.typography-rtl")}
+ []
+ (r/as-element (helpers/wrap-component [example-typography-rtl/example])))

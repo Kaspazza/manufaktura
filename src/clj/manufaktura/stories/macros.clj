@@ -1,0 +1,163 @@
+(ns manufaktura.stories.macros
+  "Compile-time macros for Storybook documentation.
+
+  Ported from mateuszmazurczak.portfolio.macros."
+  (:require
+   [clojure.java.io :as io]
+   [clojure.pprint  :as pprint]
+   [clojure.string  :as str]))
+
+(defmacro embed-source
+  "Reads source file at compile time and returns as string.
+
+  Args:
+  - namespace-symbol-or-string: The namespace to read source for (symbol or string)
+
+  Example:
+  (embed-source manufaktura.ui.components.button)
+  (embed-source 'manufaktura.ui.components.button)
+
+  Returns the full source code of the file as a string."
+  [namespace-symbol-or-string]
+  (let [ns-str (cond
+                 (symbol? namespace-symbol-or-string) (str namespace-symbol-or-string)
+                 (string? namespace-symbol-or-string) namespace-symbol-or-string
+                 :else (throw (ex-info "embed-source expects a namespace symbol or string"
+                                       {:argument namespace-symbol-or-string})))
+        file-path (-> ns-str
+                      (str/replace "." "/")
+                      (str/replace "-" "_")
+                      (str ".cljs"))
+        full-path (str "src/cljs/" file-path)]
+    (try (slurp (or (io/resource file-path) full-path))
+         (catch Exception e
+           (throw (ex-info (str "Failed to read source file: " full-path)
+                           {:namespace namespace-symbol-or-string
+                            :file-path full-path
+                            :error (.getMessage e)}
+                           e))))))
+
+(defn- call-named?
+  [form function-name]
+  (and (seq? form) (symbol? (first form)) (= function-name (name (first form)))))
+
+(defn- example-forms
+  "Removes only the outer Storybook render boundary from a story form.
+
+  A form is unwrapped solely when its exact outer shape is
+  `(r/as-element (helpers/wrap-component ...))`. Calls with either name deeper
+  in an example are consumer code and therefore remain in the displayed source."
+  [form]
+  (let [wrapped-form (second form)]
+    (if (and (call-named? form "as-element") (call-named? wrapped-form "wrap-component"))
+      (let [args (next wrapped-form)] (if (map? (first args)) (rest args) args))
+      [form])))
+
+(defn- story-source
+  [body]
+  (->> (if (= 1 (count body)) (example-forms (first body)) body)
+       (map #(with-out-str (pprint/pprint %)))
+       (apply str)
+       str/trim))
+
+(defmacro defdoc
+  "Defines an exported, zero-argument Storybook documentation story without
+  embedding its implementation as display source.
+
+  Use this for library documentation pages. Component examples should use
+  `defstory`, which publishes consumer-ready source to Storybook Docs."
+  [story-name & declaration]
+  (let [[docstring declaration] (if (string? (first declaration))
+                                  [(first declaration) (next declaration)]
+                                  [nil declaration])
+        [params & body] declaration]
+    (when-not (symbol? story-name)
+      (throw (ex-info "defdoc expects a symbol name" {:story-name story-name})))
+    (when-not (= [] params)
+      (throw (ex-info "defdoc expects an empty argument vector"
+                      {:story-name story-name
+                       :params params})))
+    (when-not (seq body)
+      (throw (ex-info "defdoc expects at least one body form" {:story-name story-name})))
+    (let [exported-name (with-meta story-name (assoc (meta story-name) :export true))]
+      `(do (defn ~exported-name ~@(when docstring [docstring]) [] ~@body)
+           (set! (.-parameters ~story-name)
+                 (~'js-obj
+                  "docs"
+                  (~'js-obj "codePanel" false "canvas" (~'js-obj "sourceState" "none"))))))))
+
+(defmacro defstory
+  "Defines an exported, zero-argument Storybook story with consumer-ready
+  display source.
+
+  The declaration has the same shape as `defn`: an optional docstring, an
+  empty argument vector, and one or more body forms. When a story has the
+  standard `r/as-element` / `helpers/wrap-component` render boundary,
+  Storybook Docs displays and copies only the wrapped component usage.
+
+  An optional config map before the argument vector accepts :source-code,
+  an expression evaluated in the emitted parameters (for example
+  (embed-source manufaktura.stories.calendar.single-date)). This overrides
+  display source verbatim without changing a zero-argument story's arity.
+  Config containing :args, :arg-types, or :decode-args defines a controlled
+  story instead and requires one args symbol; JS args are decoded to a map.
+
+  Example:
+  (defstory ButtonDemo
+    \"Primary button example.\"
+    []
+    (r/as-element
+     (helpers/wrap-component
+       [button/button {} \"Click me\"])))"
+  [story-name & declaration]
+  (let [[docstring declaration] (if (string? (first declaration))
+                                  [(first declaration) (next declaration)]
+                                  [nil declaration])
+        [config declaration]
+        (if (map? (first declaration)) [(first declaration) (next declaration)] [nil declaration])
+        [params & body] declaration
+        controlled-story? (boolean (some #(contains? config %) [:args :arg-types :decode-args]))]
+    (when-not (symbol? story-name)
+      (throw (ex-info "defstory expects a symbol name" {:story-name story-name})))
+    (when-not (if controlled-story?
+                (and (= 1 (count params)) (symbol? (first params)))
+                (= [] params))
+      (throw (ex-info (if controlled-story?
+                        "A controlled defstory expects one args symbol"
+                        "defstory expects an empty argument vector")
+                      {:story-name story-name
+                       :params params})))
+    (when-not (seq body)
+      (throw (ex-info "defstory expects at least one body form" {:story-name story-name})))
+    (let [source (if (contains? config :source-code) (:source-code config) (story-source body))
+          api-reference? (= 'ApiReference story-name)
+          exported-name (with-meta story-name (assoc (meta story-name) :export true))
+          story-object (with-meta story-name {:tag 'js})
+          args-symbol (first params)
+          decode-args (:decode-args config)
+          story-parameters
+          (if api-reference?
+            `(~'js-obj "docs" (~'js-obj "codePanel" false "canvas" (~'js-obj "sourceState" "none")))
+            `(~'js-obj
+              "docs"
+              (~'js-obj "codePanel" true "source" (~'js-obj "code" ~source "language" "clojure"))))]
+      `(do (defn ~exported-name
+             ~@(when docstring [docstring])
+             ~params
+             ~@(if controlled-story?
+                 `((let [~args-symbol ~(if decode-args
+                                         `(~decode-args
+                                           (~'js->clj ~args-symbol :keywordize-keys true))
+                                         `(~'js->clj ~args-symbol :keywordize-keys true))]
+                     ~@body))
+                 body))
+           (set! (.-parameters ~story-object)
+                 (~'js/Object.assign
+                  (~'js-obj)
+                  ~story-parameters
+                  ~(if-let [parameters (:parameters config)]
+                     `(~'clj->js ~parameters)
+                     `(~'js-obj))))
+           ~@(when controlled-story?
+               `((set! (.-args ~story-object) (~'clj->js ~(:args config)))
+                 (set! (.-argTypes ~story-object) (~'clj->js ~(:arg-types config)))))))))

@@ -1,0 +1,58 @@
+;; Manufaktura - bb tasks
+;;
+;; Dev workflow:
+;;   bb dev           - stories watcher + Storybook dev server
+;;   bb watch-stories - shadow-cljs stories watcher only
+;;   bb build-storybook - static site into storybook-static/
+
+{:tasks
+ {publish {:doc "Run the optional local publish script; optional VERSION"
+           :task (if (.isFile (java.io.File. "dev/scripts/release.sh"))
+                   (apply shell "bash" "dev/scripts/release.sh" *command-line-args*)
+                   (throw (ex-info "Local publish script is unavailable: dev/scripts/release.sh" {})))}
+  format {:doc "zprint format"
+          :extra-deps {zprint/zprint {:mvn/version "1.3.0"}}
+          :requires ([zprint.main] [babashka.fs :as fs])
+          :task (let [files (mapcat (fn [pattern] (map str (fs/glob "." pattern)))
+                                    ["**/*.clj" "**/*.cljs" "**/*.cljc" "**/*.edn"])]
+                  (apply zprint.main/-main (concat ["-w"] files *command-line-args*)))}
+
+  generate-story-modules
+  {:doc "Generate shadow-cljs ESM module config from CLJS story sources"
+   :task (shell "bb scripts/generate_story_modules.clj")}
+
+  prepare-stories
+  {:doc "Generate config and compile stories before Storybook indexes them"
+   :depends [generate-story-modules]
+   :task (shell "npx shadow-cljs compile stories --config-merge target/story-modules.edn")}
+
+  dev
+  {:doc "Full dev environment: prepare stories, then start watcher + Storybook"
+   :depends [prepare-stories]
+   :task (let [futures [(future (shell "npx shadow-cljs watch stories --config-merge target/story-modules.edn"))
+                        (future (shell "npx storybook dev -p 6010 --initial-path /story/home--overview"))]]
+           (doseq [f futures] (deref f)))}
+
+  watch-stories
+  {:doc "Watch and compile CLJS stories only"
+   :depends [generate-story-modules]
+   :task (shell "npx shadow-cljs watch stories --config-merge target/story-modules.edn")}
+
+  compile-stories
+  {:doc "One-shot compile of CLJS stories to ESM"
+   :depends [generate-story-modules]
+   :task (shell "npx shadow-cljs compile stories --config-merge target/story-modules.edn")}
+
+  storybook
+  {:doc "Prepare stories, then run Storybook dev server on port 6010"
+   :depends [prepare-stories]
+   :task (shell "npx storybook dev -p 6010 --initial-path /story/home--overview")}
+
+  build-storybook
+  {:doc "Build static Storybook site into storybook-static/"
+   :depends [prepare-stories]
+   :task (shell "npx storybook build")}
+
+  clean
+  {:doc "Remove build artifacts"
+   :task (shell "rm -rf .shadow-cljs cljs-stories storybook-static target/story-modules.edn")}}}

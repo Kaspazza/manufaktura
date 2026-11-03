@@ -1,0 +1,301 @@
+(ns manufaktura.ui.components.notification
+  "Toast notification component using Sonner.
+  
+  This component provides a toast notification system with support for
+  different toast types (success, info, warning, error, loading) and
+  custom icons from lucide-react.
+  
+  Usage:
+  1. Add the Toaster component to your app root
+  2. Use the toast function to show notifications
+  
+  Example:
+  ;; In your root component
+  [toaster]
+  
+  ;; Trigger a toast
+  (toast \"Event has been created\"
+         {:description \"Sunday, December 03, 2023 at 9:00 AM\"
+          :action {:label \"Undo\"
+                   :on-click #(js/console.log \"Undo\")}})
+
+Version: 1.0.0
+Last updated: 2026-02-06
+
+Custom component implementation."
+  (:require
+   ["lucide-react"          :refer
+                            [CircleCheckIcon InfoIcon Loader2Icon OctagonXIcon TriangleAlertIcon]]
+   ["sonner"                :refer [Toaster toast]]
+   [clojure.string          :as str]
+   [manufaktura.utils.props :refer [normalize-props]]
+   [reagent.core            :as r]))
+
+(defn- kebab->camel-key
+  [key]
+  (if (keyword? key)
+    (keyword (str/replace (name key) #"-([a-z])" (fn [[_ letter]] (str/upper-case letter))))
+    key))
+
+(def ^:private zero-arity-callback-keys #{:onClick :onDismiss :onAutoClose})
+
+(defn- normalize-option-maps
+  [value]
+  (cond
+    (map? value) (reduce-kv (fn [result key child]
+                              (let [normalized-key (kebab->camel-key key)]
+                                (assoc result
+                                       normalized-key
+                                       (if (and (contains? zero-arity-callback-keys normalized-key)
+                                                (fn? child))
+                                         (fn [& _] (child))
+                                         (normalize-option-maps child)))))
+                            {}
+                            (normalize-props value))
+    (vector? value) (mapv normalize-option-maps value)
+    (seq? value) (map normalize-option-maps value)
+    :else value))
+
+(defn- sonner-props [props] (clj->js (normalize-option-maps (or props {}))))
+
+(defn toaster
+  "Toast notification provider component.
+  
+  This component should be placed once in your app root component.
+  It renders the toast container with custom styling and icons.
+  
+  Props:
+  - All props from Sonner's ToasterProps are supported
+  - Additional Tailwind classes can be passed via :class
+  
+  The component uses CSS variables from your Tailwind theme:
+  - --popover for background
+  - --popover-foreground for text
+  - --border for borders
+  - --radius for border radius
+  
+  Custom icons are provided for each toast type:
+  - success: CircleCheckIcon
+  - info: InfoIcon
+  - warning: TriangleAlertIcon
+  - error: OctagonXIcon
+  - loading: Loader2Icon (with spin animation)"
+  [& [props]]
+  [:>
+   Toaster
+   (sonner-props
+    (merge {:class-name "toaster group"
+            :position "top-right"
+            :icons {:success (r/as-element [:> CircleCheckIcon {:className "size-4"}])
+                    :info (r/as-element [:> InfoIcon {:className "size-4"}])
+                    :warning (r/as-element [:> TriangleAlertIcon {:className "size-4"}])
+                    :error (r/as-element [:> OctagonXIcon {:className "size-4"}])
+                    :loading (r/as-element [:>
+                                            Loader2Icon
+                                            {:className
+                                             "size-4 animate-spin motion-reduce:animate-none"}])}
+            :style {"--normal-bg" "var(--popover)"
+                    "--normal-text" "var(--popover-foreground)"
+                    "--normal-border" "var(--border)"
+                    "--border-radius" "var(--radius)"}}
+           (normalize-props (or props {}))))])
+
+(defn show-toast
+  "Display a toast notification.
+  
+  This is a wrapper around Sonner's toast function that provides
+  a more Clojure-friendly API.
+  
+  Args:
+  - message: String message to display
+  - options: Optional map with keys:
+    - :description - Additional description text
+    - :action - Map with :label and :on-click for an action button
+    - :duration - How long to show the toast (ms)
+    - :position - Position of toast (e.g., \"top-right\", \"bottom-center\")
+    - :cancel - Map with :label and :on-click for a cancel button
+    - :id - Custom ID for the toast
+    - :important - Boolean, if true prevents dismissal
+    - :on-dismiss - Callback when toast is dismissed
+    - :on-auto-close - Callback when toast auto-closes
+  Both kebab-case and camelCase prop spellings are accepted.
+  
+  Returns:
+  - Toast ID that can be used with dismiss-toast
+  
+  Examples:
+  ;; Simple toast
+  (show-toast \"Success!\")
+  
+  ;; Toast with description
+  (show-toast \"Event created\"
+              {:description \"Sunday, December 03, 2023 at 9:00 AM\"})
+  
+  ;; Toast with action
+  (show-toast \"File deleted\"
+              {:action {:label \"Undo\"
+                        :on-click #(js/console.log \"Undo clicked\")}})
+  
+  ;; Custom position and duration
+  (show-toast \"Warning!\"
+              {:duration 5000
+               :position \"top-center\"})"
+  ([message] (show-toast message nil))
+  ([message options] (toast message (sonner-props options))))
+
+(defn show-success
+  "Display a success toast with outline styling.
+  
+  Uses consistent green color scheme for success messages:
+  - Light mode: green-600
+  - Dark mode: green-400
+  
+  Args:
+  - message: String message to display
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (show-success \"Action completed successfully!\")"
+  ([message] (show-success message nil))
+  ([message options]
+   (let [styled-options
+         (assoc options
+                :style
+                {"--normal-bg" "var(--background)"
+                 "--normal-text" "light-dark(var(--color-green-600), var(--color-green-400))"
+                 "--normal-border" "light-dark(var(--color-green-600), var(--color-green-400))"})]
+     (toast.success message (sonner-props styled-options)))))
+
+(defn show-error
+  "Display an error toast with destructive outline styling.
+  
+  Uses the theme's destructive color for error messages.
+  
+  Args:
+  - message: String message to display
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (show-error \"Oops, there was an error processing your request.\")"
+  ([message] (show-error message nil))
+  ([message options]
+   (let [styled-options (assoc options
+                               :style
+                               {"--normal-bg" "var(--background)"
+                                "--normal-text" "var(--destructive)"
+                                "--normal-border" "var(--destructive)"})]
+     (toast.error message (sonner-props styled-options)))))
+
+(defn show-info
+  "Display an info toast with outline styling.
+  
+  Uses consistent sky/blue color scheme for informational messages:
+  - Light mode: sky-600
+  - Dark mode: sky-400
+  
+  Args:
+  - message: String message to display
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (show-info \"This is for your information, please note.\")"
+  ([message] (show-info message nil))
+  ([message options]
+   (let [styled-options
+         (assoc options
+                :style
+                {"--normal-bg" "var(--background)"
+                 "--normal-text" "light-dark(var(--color-sky-600), var(--color-sky-400))"
+                 "--normal-border" "light-dark(var(--color-sky-600), var(--color-sky-400))"})]
+     (toast.info message (sonner-props styled-options)))))
+
+(defn show-warning
+  "Display a warning toast with outline styling.
+  
+  Uses consistent amber/yellow color scheme for warning messages:
+  - Light mode: amber-600
+  - Dark mode: amber-400
+  
+  Args:
+  - message: String message to display
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (show-warning \"Warning: Please check the entered data.\")"
+  ([message] (show-warning message nil))
+  ([message options]
+   (let [styled-options
+         (assoc options
+                :style
+                {"--normal-bg" "var(--background)"
+                 "--normal-text" "light-dark(var(--color-amber-600), var(--color-amber-400))"
+                 "--normal-border" "light-dark(var(--color-amber-600), var(--color-amber-400))"})]
+     (toast.warning message (sonner-props styled-options)))))
+
+(defn show-loading
+  "Display a loading toast.
+  
+  Args:
+  - message: String message to display
+  - options: Optional map (same as show-toast)
+  
+  Returns:
+  - Toast ID that can be used to update or dismiss the toast
+  
+  Example:
+  (let [toast-id (show-loading \"Uploading file...\")]
+    ;; Later, dismiss it
+    (dismiss-toast toast-id))"
+  ([message] (show-loading message nil))
+  ([message options] (toast.loading message (sonner-props options))))
+
+(defn show-promise
+  "Display a toast for a promise.
+  
+  Automatically shows loading state, then success or error based on promise result.
+  
+  Args:
+  - promise: JavaScript promise or ClojureScript promise
+  - messages: Map with :loading, :success, and :error messages
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (show-promise
+    (js/fetch \"/api/data\")
+    {:loading \"Fetching data...\"
+     :success \"Data loaded!\"
+     :error \"Failed to load data\"})"
+  ([promise messages] (toast.promise promise (sonner-props messages)))
+  ([promise messages options]
+   (toast.promise promise (sonner-props (merge (or options {}) messages)))))
+
+(defn dismiss-toast
+  "Dismiss a specific toast by ID, or all toasts if no ID provided.
+  
+  Args:
+  - toast-id: Optional toast ID to dismiss (from show-toast, show-loading, etc.)
+  
+  Examples:
+  ;; Dismiss specific toast
+  (dismiss-toast \"my-toast-id\")
+  
+  ;; Dismiss all toasts
+  (dismiss-toast)"
+  ([] (toast.dismiss))
+  ([toast-id] (toast.dismiss toast-id)))
+
+(defn custom-toast
+  "Display a custom toast with a custom component.
+  
+  Args:
+  - component: Reagent component or React element to render
+  - options: Optional map (same as show-toast)
+  
+  Example:
+  (custom-toast
+    [:div {:class \"flex items-center gap-2\"}
+     [:span \"Custom content\"]]
+    {:duration 3000})"
+  [component options]
+  (toast.custom (fn [_toast-id] (if (vector? component) (r/as-element component) component))
+                (sonner-props options)))

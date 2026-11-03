@@ -1,0 +1,149 @@
+(ns manufaktura.ui.components.popover
+  "Popover component for displaying floating content relative to a trigger.
+  https://www.radix-ui.com/primitives/docs/components/popover
+
+Version: 1.0.0
+Last updated: 2026-02-06
+
+Based on Radix UI primitives.
+Documentation: https://www.radix-ui.com/primitives/docs/components/popover"
+  (:require
+   ["@radix-ui/react-popover" :as RadixPopover]
+   [manufaktura.utils.props   :refer [normalize-props]]
+   [manufaktura.utils.styles  :refer [merge-classes]]))
+
+(defn popover
+  "Root popover component. Controls open/closed state.
+  
+  Props:
+  - `:open` - Controlled open state (boolean)
+  - `:defaultOpen` - Default open state for uncontrolled usage
+  - `:onOpenChange` - Callback when open state changes (fn [open?])
+  - `:modal` - Whether to trap focus (default: false, unlike Dialog)
+  
+  Example:
+  [popover {:open @open? :onOpenChange #(reset! open? %)}
+   [popover-trigger {} [button {} \"Open\"]]
+   [popover-content {}
+    [:div \"Popover content\"]]]"
+  [props & children]
+  (into [:> RadixPopover/Root (assoc props :data-slot "popover")] children))
+
+(defn popover-trigger
+  "Trigger element that opens the popover when clicked.
+  
+  Props:
+  - `:asChild` - Compose with child component (default: false)
+  
+  Example:
+  [popover-trigger {}
+   [button {:variant :outline} \"Open Popover\"]]"
+  [props & children]
+  (into [:> RadixPopover/Trigger (assoc props :data-slot "popover-trigger")] children))
+
+(defn popover-anchor
+  "Optional anchor element to position the popover relative to.
+  If not provided, the trigger is used as the anchor.
+  
+  Props:
+  - `:asChild` - Compose with child component
+  
+  Example:
+  [popover-anchor {:asChild true}
+   [:div {:ref anchor-ref} \"Anchor element\"]]"
+  [props & children]
+  (into [:> RadixPopover/Anchor (assoc props :data-slot "popover-anchor")] children))
+
+(defn popover-content
+  "Popover content container with portal rendering and positioning.
+  
+  Props:
+  - `:class` - Additional Tailwind classes
+  - `:align` - Alignment relative to trigger: \"start\", \"center\" (default), \"end\"
+  - `:side` - Which side to place popover: \"top\", \"right\", \"bottom\" (default), \"left\"
+  - `:sideOffset` - Distance in pixels from the trigger (default: 4)
+  - `:alignOffset` - Offset along the align axis
+  - `:collisionPadding` - Padding from viewport edges when positioning
+  - `:avoidCollisions` - Whether to avoid collisions with viewport (default: true)
+  Both kebab-case and camelCase prop spellings are accepted.
+  
+  Features:
+  - Automatically portaled to document body
+  - Animated entry/exit
+  - Smart collision detection and repositioning
+  - Focus management
+  - ESC to close
+  
+  Example:
+  [popover-content {:align \"start\" :side \"bottom\"}
+   [:div {:class \"space-y-2\"}
+    [:h4 {:class \"font-medium\"} \"Popover Title\"]
+    [:p {:class \"text-sm text-muted-foreground\"}
+     \"Additional information here.\"]]]"
+  [{:as raw-props} & children]
+  (let [{:keys [class align side-offset]
+         :or {align "center"
+              side-offset 4}
+         :as props}
+        (normalize-props raw-props)]
+    [:>
+     RadixPopover/Portal
+     (into [:>
+            RadixPopover/Content
+            (-> props
+                (assoc :data-slot "popover-content"
+                       :align align
+                       :sideOffset side-offset
+                       :class (merge-classes
+                               ["bg-popover text-popover-foreground"
+                                "data-[state=open]:animate-in data-[state=closed]:animate-out"
+                                "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+                                "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+                                "data-[side=bottom]:slide-in-from-top-2"
+                                "data-[side=left]:slide-in-from-right-2"
+                                "data-[side=right]:slide-in-from-left-2"
+                                "data-[side=top]:slide-in-from-bottom-2"
+                                "z-50 w-72"
+                                "origin-(--radix-popover-content-transform-origin)"
+                                "rounded-md border p-4 shadow-md outline-hidden"]
+                               class))
+                (dissoc :class-name))]
+           children)]))
+
+(defn popover-header
+  "Groups a popover title and description. Additional props are forwarded to the div."
+  [{:as raw-props} & children]
+  (let [{:keys [class]
+         :as props}
+        (normalize-props raw-props)]
+    (into [:div
+           (-> props
+               (assoc :data-slot "popover-header"
+                      :class (merge-classes "flex flex-col gap-1 text-sm" class))
+               (dissoc :class-name))]
+          children)))
+
+(defn popover-title
+  "Visual title for popover content. Renders the upstream div and forwards all props."
+  [{:as raw-props} & children]
+  (let [{:keys [class]
+         :as props}
+        (normalize-props raw-props)]
+    (into [:div
+           (-> props
+               (assoc :data-slot "popover-title" :class (merge-classes "font-medium" class))
+               (dissoc :class-name))]
+          children)))
+
+(defn popover-description
+  "Supporting text for a popover title. Additional props are forwarded to the paragraph."
+  [{:as raw-props} & children]
+  (let [{:keys [class]
+         :as props}
+        (normalize-props raw-props)]
+    (into [:p
+           (-> props
+               (assoc :data-slot "popover-description"
+                      :class (merge-classes "text-muted-foreground" class))
+               (dissoc :class-name))]
+          children)))

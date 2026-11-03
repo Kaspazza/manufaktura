@@ -1,0 +1,15 @@
+{:deps {:aliases [:cljs-dev]}
+
+ :nrepl {:port 8777 :middleware [cider.piggieback/wrap-cljs-repl]}
+
+ :builds
+ {;; Storybook stories - compiled to native ESM format for Storybook/Vite.
+  ;; `bb generate-story-modules` derives :modules from story sources and each
+  ;; workflow passes that generated config through shadow-cljs --config-merge.
+  :stories
+  {:target       :esm
+   :output-dir   "cljs-stories"
+   ;; Let Storybook/Vite resolve npm dependencies. In particular, Reagent and
+   ;; Storybook must use the same React instance for the hooks dispatcher.
+   :js-options   {:js-provider :import}
+   :devtools     {:enabled false}}}}

@@ -1,0 +1,156 @@
+(ns manufaktura.stories.speech-recognition-button-stories
+  "Storybook stories for the Speech Recognition Button component. Ported from mateuszmazurczak.portfolio.ui-components.speech_recognition_button."
+  (:require
+   [manufaktura.stories.helpers                                                 :as helpers]
+   [manufaktura.stories.speech-recognition-button.playground                    :as
+                                                                                example-playground]
+   [manufaktura.stories.speech-recognition-button.speech-recognition-in-prompt
+    :as example-speech-recognition-in-prompt]
+   [manufaktura.stories.speech-recognition-button.speech-recognition-standalone
+    :as example-speech-recognition-standalone]
+   [manufaktura.stories.speech-recognition-button.speech-recognition-transcript
+    :as example-speech-recognition-transcript]
+   [reagent.core                                                                :as r])
+  (:require-macros [manufaktura.stories.macros :refer [embed-source defstory defdoc]]))
+
+(def ^:export default
+  #js {:title "Components/Speech Recognition Button"
+       :parameters #js {:layout "padded"}})
+
+(defdoc Installation
+        "Install dependencies and copy the component code into your project."
+        []
+        (r/as-element
+         [helpers/installation-scene
+          {:description "Microphone button component with speech recognition functionality."
+           :npm-install "npm install lucide-react react-speech-recognition"
+           :source-code (embed-source "manufaktura.ui.components.speech_recognition_button")
+           :namespace-path "src/cljs/manufaktura/ui/components/speech_recognition_button.cljs"
+           :filename "speech_recognition_button.cljs"}]))
+
+(defstory
+ ApiReference
+ []
+ (r/as-element
+  (helpers/wrap-component
+   [:div {:class "p-6 max-w-4xl"}
+    [:div {:class "space-y-4"}
+     [helpers/api-component-card
+      {:component-name "speech-recognition-button"
+       :description
+       "Microphone action button built on react-speech-recognition. Starts/stops listening and streams transcript text through a callback."
+       :link {:href "https://www.npmjs.com/package/react-speech-recognition"
+              :label "react-speech-recognition Docs"}
+       :props
+       [{:name ":on-transcript-change"
+         :type "function"
+         :default nil
+         :description "Called whenever transcript updates: (fn [text] ...)."}
+        {:name ":on-error"
+         :type "function"
+         :default nil
+         :description
+         "Called if starting recognition rejects: (fn [error] ...). This requires a real browser/API failure; stories do not simulate it without an injection seam."}
+        {:name ":language"
+         :type "string"
+         :default "\"en-US\""
+         :description "Speech recognition locale, e.g. \"pl-PL\" or \"en-US\"."}
+        {:name ":continuous"
+         :type "boolean"
+         :default "true"
+         :description "Continue listening after pauses in speech."}
+        {:name ":class"
+         :type "string"
+         :default nil
+         :description "Additional classes applied to the prompt-input action wrapper."}]}]
+     [:div {:class "border rounded-lg p-4 bg-amber-500/10 border-amber-500/30 mb-4"}
+      [:h4 {:class "text-sm font-semibold mb-2"}
+       "⚠️ Important Notes"]
+      [:ul {:class "text-xs text-muted-foreground space-y-1 list-disc pl-4"}
+       [:li
+        "Best used inside prompt-input-actions, because it renders a prompt-input-action wrapper internally."]
+       [:li
+        "When browser speech recognition is unsupported, the component renders a disabled button fallback."]
+       [:li
+        "For production UX, pair with visible text state so users can confirm recognized transcript."]]]
+     [:div {:class "border rounded-lg p-4 bg-muted/50"}
+      [:h4 {:class "text-sm font-semibold mb-2"}
+       "Usage Example"]
+      [:pre {:class "text-xs overflow-x-auto"}
+       [:code
+        "(let [value (r/atom \"\")]\n  [prompt-input {:value @value\n                 :on-value-change #(reset! value %)}\n   [prompt-input-textarea {:placeholder \"Speak or type...\"}]\n   [prompt-input-actions {}\n    [speech-recognition-button {:language \"en-US\"\n                                :on-transcript-change #(reset! value %)}]]])"]]]]])))
+
+(defstory
+ SpeechRecognitionStandalone
+ "Standalone speech recognition action.
+  Wraps react-speech-recognition for microphone input.
+
+  Use inside prompt-input actions for best UX."
+ {:source-code (embed-source
+                "manufaktura.stories.speech-recognition-button.speech-recognition-standalone")}
+ []
+ (r/as-element (helpers/wrap-component [example-speech-recognition-standalone/example])))
+
+(defstory SpeechRecognitionInPrompt
+          "Speech recognition inside prompt input.
+  Demonstrates composition with prompt-input."
+          {:source-code
+           (embed-source
+            "manufaktura.stories.speech-recognition-button.speech-recognition-in-prompt")}
+          []
+          (r/as-element (helpers/wrap-component [example-speech-recognition-in-prompt/example])))
+
+(defstory SpeechRecognitionTranscript
+          "Transcript display with live updates.
+  Shows how to mirror transcript into the UI."
+          {:source-code
+           (embed-source
+            "manufaktura.stories.speech-recognition-button.speech-recognition-transcript")}
+          []
+          (r/as-element (helpers/wrap-component [example-speech-recognition-transcript/example])))
+
+
+(defstory
+ Playground
+ "Speech-recognition playground."
+ {:args {:language "en-US"
+         :continuous true}
+  :arg-types {:language {:name "Language"
+                         :control {:type "select"}
+                         :options ["ar-SA"
+                                   "cs-CZ"
+                                   "da-DK"
+                                   "de-DE"
+                                   "en-GB"
+                                   "en-US"
+                                   "es-ES"
+                                   "es-MX"
+                                   "fi-FI"
+                                   "fr-FR"
+                                   "hi-IN"
+                                   "it-IT"
+                                   "ja-JP"
+                                   "ko-KR"
+                                   "nb-NO"
+                                   "nl-NL"
+                                   "pl-PL"
+                                   "pt-BR"
+                                   "pt-PT"
+                                   "sk-SK"
+                                   "sv-SE"
+                                   "tr-TR"
+                                   "uk-UA"
+                                   "zh-CN"
+                                   "zh-TW"]}
+              :continuous {:name "Continuous listening"
+                           :control {:type "boolean"}}}
+  :parameters
+  {:playground
+   {:description
+    "Explore speech recognition button language and continuous listening with a live preview."}
+   :controls {:expanded false
+              :exclude ["on-transcript-change" "class"]}}
+  :source-code (embed-source "manufaktura.stories.speech-recognition-button.playground")}
+ [args]
+ (r/as-element (helpers/wrap-component [example-playground/example args])))
+\n
