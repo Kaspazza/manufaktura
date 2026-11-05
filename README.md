@@ -4,6 +4,10 @@
 
 Build with polished Reagent components. Keep the source. Make them yours.
 
+Explore the components on the **[official Manufaktura showcase](https://mateuszmazurczak.com/manufaktura)**.
+
+[![Manufaktura component showcase with theme customization and live component previews](docs/component-showcase.png)](https://mateuszmazurczak.com/manufaktura)
+
 > “A chair. And something more amazing, another chair!
 > Not a big deal? [chuckles]
 > They are identical.
